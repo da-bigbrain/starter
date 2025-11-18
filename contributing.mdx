@@ -1,0 +1,380 @@
+---
+title: "Contributing"
+description: "How to contribute to NeuroFocus"
+---
+
+# Contributing
+
+Thanks for your interest in NeuroFocus. We welcome contributions from the community.
+
+## Ways to Contribute
+
+### Report Issues
+
+Found a bug? Let us know:
+
+1. Check existing issues first
+2. Create a new issue with:
+   - Clear title
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Your hardware/software setup
+
+### Suggest Features
+
+Have an idea? Open an issue with:
+
+- Use case description
+- How it would work
+- Why it's useful
+
+### Submit Code
+
+Ready to code? Follow this process:
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
+
+## Development Setup
+
+### Requirements
+
+- PlatformIO
+- Git
+- NeuroFocus V4 hardware (for testing)
+
+### Clone and Build
+
+```bash
+git clone https://github.com/da-bigbrain/neurofocus.git
+cd neurofocus/firmware/v4
+pio run
+```
+
+### Project Structure
+
+```
+firmware/v4/
+├── src/              # Source code
+├── docs/             # Documentation
+├── test/             # Test code
+└── platformio.ini    # Build config
+```
+
+## Coding Standards
+
+### Style Guide
+
+**General:**
+- Use clear variable names
+- Add comments for complex logic
+- Keep functions small and focused
+
+**C++ Specific:**
+- Use camelCase for variables
+- Use PascalCase for classes
+- Use UPPER_CASE for constants
+
+**Example:**
+```cpp
+class MyComponent {
+  public:
+    void doSomething();
+    
+  private:
+    int myVariable;
+    static const int MAX_VALUE = 100;
+};
+```
+
+### Documentation
+
+**Comment your code:**
+```cpp
+// Check if data is ready before reading
+if (ads1220.isDataReady()) {
+  long data = ads1220.readRawData();
+}
+```
+
+**Update docs when you change features:**
+- Update API reference for new functions
+- Add usage examples
+- Update architecture docs if needed
+
+## Testing
+
+### Hardware Testing
+
+Before submitting:
+
+1. Build and upload to device
+2. Test all commands (b, s, v)
+3. Verify data streaming works
+4. Check for error messages
+
+### Serial Mode Testing
+
+```cpp
+// Disable BLE for testing
+#define ENABLE_BLE 0
+```
+
+Then test:
+- Streaming starts/stops correctly
+- Commands work as expected
+- No crashes or hangs
+
+### BLE Mode Testing
+
+```cpp
+#define ENABLE_BLE 1
+```
+
+Then test:
+- Device advertises correctly
+- Connects and streams data
+- Handles disconnection gracefully
+- Commands work via BLE
+
+## Pull Request Process
+
+### Before Submitting
+
+- [ ] Code builds without errors
+- [ ] Tested on real hardware
+- [ ] No compiler warnings
+- [ ] Documentation updated
+- [ ] Commit messages are clear
+
+### Commit Messages
+
+Use clear, descriptive messages:
+
+**Good:**
+```
+Add 50Hz filter configuration option
+```
+
+**Bad:**
+```
+fixed stuff
+```
+
+### PR Description
+
+Include:
+
+- What changed
+- Why it changed
+- How to test it
+- Any breaking changes
+
+**Example:**
+```markdown
+## Changes
+Added configurable sample rate for ADS1220
+
+## Motivation
+Users requested different sampling rates for various applications
+
+## Testing
+1. Set rate in config.h
+2. Upload firmware
+3. Verify output rate matches setting
+
+## Breaking Changes
+None - defaults to 660 SPS (existing behavior)
+```
+
+## Code Review
+
+### What We Look For
+
+- **Correctness**: Does it work as intended?
+- **Safety**: No memory leaks or buffer overflows?
+- **Style**: Follows project conventions?
+- **Documentation**: Is it documented?
+
+### Response Time
+
+We try to review PRs within one week. Be patient if it takes longer.
+
+### Changes Requested
+
+If we ask for changes:
+
+1. Make the requested changes
+2. Push to your branch (PR updates automatically)
+3. Comment when ready for re-review
+
+## Hardware Contributions
+
+### PCB Design
+
+Want to improve the hardware?
+
+1. Use KiCad 6.0 or later
+2. Document changes in commit message
+3. Include schematic and layout files
+4. Add gerbers for manufacturing
+
+### Testing New Designs
+
+Before submitting:
+
+- Build and test the PCB
+- Verify all signals work correctly
+- Document any issues found
+- Include photos of assembled board
+
+## Documentation
+
+### Improving Docs
+
+Found unclear documentation?
+
+1. Fork the repo
+2. Edit the .mdx files
+3. Preview locally
+4. Submit PR
+
+### Adding Examples
+
+Share your project:
+
+1. Write clear example code
+2. Add comments explaining each step
+3. Include expected output
+4. Submit as PR to examples/ folder
+
+## Community Guidelines
+
+### Be Respectful
+
+- Use welcoming language
+- Respect different viewpoints
+- Focus on constructive feedback
+
+### Be Patient
+
+- Maintainers are volunteers
+- Reviews take time
+- Not all PRs can be merged
+
+### Stay on Topic
+
+- Keep discussions relevant
+- Use appropriate channels (issues vs discussions)
+
+## Feature Requests
+
+### What We Accept
+
+Features that:
+- Fit the project scope
+- Don't break existing functionality
+- Are well-tested
+- Have clear documentation
+
+### What We Usually Decline
+
+Features that:
+- Are too specific to one use case
+- Significantly increase complexity
+- Break compatibility
+- Lack proper testing
+
+## Bug Reports
+
+### Good Bug Reports Include
+
+1. **Environment**
+   - Hardware version
+   - Firmware version
+   - Operating system
+
+2. **Steps to Reproduce**
+   - What you did
+   - What happened
+   - What you expected
+
+3. **Logs**
+   - Serial output
+   - Error messages
+   - Stack traces
+
+**Example:**
+```markdown
+## Environment
+- NeuroFocus V4-3
+- Firmware: v4 latest (commit abc123)
+- OS: Ubuntu 22.04
+
+## Steps
+1. Upload firmware with ENABLE_BLE=1
+2. Connect via bluetoothctl
+3. Send command 'b'
+
+## Expected
+Streaming should start
+
+## Actual
+Device resets after ~5 seconds
+Serial shows: "Guru Meditation Error: Core 0 panic'ed"
+
+## Logs
+[Full serial output here]
+```
+
+## Questions
+
+### Where to Ask
+
+- **Issues**: For bugs and feature requests
+- **Discussions**: For questions and ideas
+- **Discord**: For real-time chat (if available)
+
+### How to Ask
+
+Be specific:
+
+**Good:**
+"How do I change the ADS1220 sample rate to 330 SPS?"
+
+**Bad:**
+"It's not working"
+
+## License
+
+By contributing, you agree that your contributions will be licensed under the GNU Affero General Public License v3.0 (AGPL-3.0).
+
+This means:
+
+- Your code can be used and modified by anyone
+- Modified versions must also be open source
+- Network use counts as distribution
+
+Read the full license in the LICENSE file.
+
+## Recognition
+
+Contributors are credited in:
+- Release notes
+- README contributors section
+- Commit history
+
+Significant contributions may be highlighted in project announcements.
+
+## Getting Help
+
+Need help contributing?
+
+- Comment on the issue you want to work on
+- Ask in discussions
+- Check existing code for examples
+
+We're here to help new contributors succeed.

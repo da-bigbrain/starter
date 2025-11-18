@@ -1,0 +1,531 @@
+---
+title: "Firmware API Reference"
+description: "Complete API documentation for NeuroFocus V4 firmware"
+---
+
+# Firmware API Reference
+
+This page documents all firmware components and their functions.
+
+## ADS1220Driver
+
+Handles low-level communication with the ADS1220 ADC chip.
+
+### Methods
+
+#### `bool init()`
+
+Initializes the ADS1220 ADC and configures SPI.
+
+**Returns:** `true` if successful, `false` if ADC not found
+
+**Example:**
+```cpp
+ADS1220Driver ads1220;
+if (!ads1220.init()) {
+  Serial.println("ADC init failed");
+}
+```
+
+#### `void reset()`
+
+Resets the ADS1220 to default settings.
+
+**Example:**
+```cpp
+ads1220.reset();
+delay(100);  // Wait for reset
+```
+
+#### `void configure()`
+
+Configures ADC settings for EEG acquisition:
+- Gain: 1x
+- Data rate: 660 SPS
+- Reference: External 3.3V
+- FIR filter: 50/60Hz rejection
+- Mode: Continuous conversion
+
+Called automatically by `init()`.
+
+#### `bool isDataReady()`
+
+Checks if new data is available from the ADC.
+
+**Returns:** `true` if data ready, `false` otherwise
+
+**Example:**
+```cpp
+if (ads1220.isDataReady()) {
+  long data = ads1220.readRawData();
+}
+```
+
+#### `long readRawData()`
+
+Reads the latest raw ADC value.
+
+**Returns:** 24-bit signed integer
+
+**Range:** -8,388,608 to 8,388,607
+
+**Example:**
+```cpp
+long rawValue = ads1220.readRawData();
+Serial.println(rawValue);
+```
+
+## BLEManager
+
+Manages Bluetooth Low Energy communication.
+
+### Constants
+
+```cpp
+#define DEVICE_NAME "NEUROFOCUS_V4"
+#define SERVICE_UUID "0338ff7c-6251-4029-a5d5-24e4fa856c8d"
+#define CHARACTERISTIC_DATA_UUID "ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7"
+#define CHARACTERISTIC_CMD_UUID "b5e3d1c9-8a2f-4e7b-9c6d-1a3f5e7b9c2d"
+```
+
+### Methods
+
+#### `bool init()`
+
+Initializes BLE server and starts advertising.
+
+**Returns:** `true` if successful
+
+**Example:**
+```cpp
+BLEManager bleManager;
+if (!bleManager.init()) {
+  Serial.println("BLE init failed");
+}
+```
+
+#### `void update()`
+
+Updates BLE connection state. Call this in your main loop.
+
+**Example:**
+```cpp
+void loop() {
+  bleManager.update();
+}
+```
+
+#### `void sendData(long value)`
+
+Sends data value via BLE notification.
+
+**Parameters:**
+- `value`: Raw ADC reading to send
+
+**Example:**
+```cpp
+long data = ads1220.readRawData();
+bleManager.sendData(data);
+```
+
+#### `bool isConnected()`
+
+Checks if a BLE client is connected.
+
+**Returns:** `true` if connected
+
+**Example:**
+```cpp
+if (bleManager.isConnected()) {
+  bleManager.sendData(rawValue);
+}
+```
+
+#### `bool wasJustConnected()`
+
+Detects connection change (disconnected → connected).
+
+**Returns:** `true` on new connection
+
+**Example:**
+```cpp
+if (bleManager.wasJustConnected()) {
+  Serial.println("Client connected");
+  streamer.start();
+}
+```
+
+#### `bool wasJustDisconnected()`
+
+Detects disconnection change (connected → disconnected).
+
+**Returns:** `true` on disconnection
+
+**Example:**
+```cpp
+if (bleManager.wasJustDisconnected()) {
+  Serial.println("Client disconnected");
+  streamer.stop();
+}
+```
+
+#### `bool hasCommand()`
+
+Checks if a command was received via BLE.
+
+**Returns:** `true` if command available
+
+#### `char getCommand()`
+
+Retrieves the received command character.
+
+**Returns:** Command character (`b`, `s`, or `v`)
+
+**Example:**
+```cpp
+if (bleManager.hasCommand()) {
+  char cmd = bleManager.getCommand();
+  if (cmd == 'b') {
+    streamer.start();
+  }
+}
+```
+
+## EEGStreamer
+
+Manages high-level EEG data streaming.
+
+### Constructor
+
+```cpp
+EEGStreamer(ADS1220Driver& ads, BLEManager* ble = nullptr)
+```
+
+**Parameters:**
+- `ads`: Reference to ADS1220Driver instance
+- `ble`: Pointer to BLEManager (nullptr for Serial-only mode)
+
+**Example:**
+```cpp
+ADS1220Driver ads1220;
+BLEManager bleManager;
+EEGStreamer streamer(ads1220, &bleManager);
+
+// Or for Serial-only:
+EEGStreamer streamer(ads1220, nullptr);
+```
+
+### Methods
+
+#### `void start()`
+
+Starts data streaming.
+
+**Example:**
+```cpp
+streamer.start();
+Serial.println("Streaming started");
+```
+
+#### `void stop()`
+
+Stops data streaming.
+
+**Example:**
+```cpp
+streamer.stop();
+Serial.println("Streaming stopped");
+```
+
+#### `void update()`
+
+Reads and streams data if available. Call this in your main loop.
+
+**Example:**
+```cpp
+void loop() {
+  streamer.update();
+  delayMicroseconds(100);
+}
+```
+
+#### `bool isStreaming()`
+
+Checks if currently streaming.
+
+**Returns:** `true` if streaming active
+
+**Example:**
+```cpp
+if (streamer.isStreaming()) {
+  led.on();
+} else {
+  led.off();
+}
+```
+
+## CommandHandler
+
+Processes commands from Serial and BLE.
+
+### Enum
+
+```cpp
+enum Command {
+  NONE,
+  STREAM_START,
+  STREAM_STOP,
+  RESET
+};
+```
+
+### Constructor
+
+```cpp
+CommandHandler(BLEManager* ble = nullptr)
+```
+
+**Parameters:**
+- `ble`: Pointer to BLEManager (nullptr for Serial-only)
+
+### Methods
+
+#### `Command process()`
+
+Checks for and processes commands from Serial or BLE.
+
+**Returns:** Command enum value
+
+**Example:**
+```cpp
+CommandHandler cmdHandler(&bleManager);
+
+void loop() {
+  CommandHandler::Command cmd = cmdHandler.process();
+  
+  switch (cmd) {
+    case CommandHandler::STREAM_START:
+      streamer.start();
+      break;
+    case CommandHandler::STREAM_STOP:
+      streamer.stop();
+      break;
+    case CommandHandler::RESET:
+      ads1220.reset();
+      ads1220.init();
+      break;
+    default:
+      break;
+  }
+}
+```
+
+## LedController
+
+Manages status LED for visual feedback.
+
+### Methods
+
+#### `void init()`
+
+Initializes LED pin.
+
+**Example:**
+```cpp
+LedController led;
+led.init();
+```
+
+#### `void on()`
+
+Turns LED on.
+
+#### `void off()`
+
+Turns LED off.
+
+#### `void toggle()`
+
+Toggles LED state.
+
+#### `void blink(int times, int duration = 250)`
+
+Blinks LED a specified number of times.
+
+**Parameters:**
+- `times`: Number of blinks
+- `duration`: Duration of each blink in milliseconds (default: 250)
+
+**Example:**
+```cpp
+led.blink(3);        // Blink 3 times
+led.blink(5, 100);   // Fast blink 5 times
+```
+
+## Configuration Constants
+
+Defined in `config.h`:
+
+```cpp
+// Communication Mode
+#define ENABLE_BLE 1  // 1 = BLE enabled, 0 = Serial only
+
+// Pin Definitions
+#define ADS1220_CS_PIN 34
+#define ADS1220_DRDY_PIN 33
+#define SPI_SCLK_PIN 36
+#define SPI_MISO_PIN 37
+#define SPI_MOSI_PIN 35
+#define LED_PIN 21
+
+// Serial Commands
+#define CMD_STREAM_START 'b'
+#define CMD_STREAM_STOP 's'
+#define CMD_RESET 'v'
+
+// Serial Settings
+#define SERIAL_BAUD 115200
+```
+
+## Usage Examples
+
+### Basic Serial-Only Setup
+
+```cpp
+#include "config.h"
+#include "ads1220_driver.h"
+#include "eeg_streamer.h"
+#include "command_handler.h"
+#include "led_controller.h"
+
+ADS1220Driver ads1220;
+CommandHandler cmdHandler(nullptr);
+EEGStreamer streamer(ads1220, nullptr);
+LedController led;
+
+void setup() {
+  Serial.begin(SERIAL_BAUD);
+  led.init();
+  
+  if (!ads1220.init()) {
+    Serial.println("ADC init failed");
+    while (1) led.blink(1, 100);
+  }
+  
+  Serial.println("Ready");
+  led.blink(2);
+}
+
+void loop() {
+  CommandHandler::Command cmd = cmdHandler.process();
+  
+  if (cmd == CommandHandler::STREAM_START) {
+    streamer.start();
+  } else if (cmd == CommandHandler::STREAM_STOP) {
+    streamer.stop();
+  }
+  
+  streamer.update();
+  delayMicroseconds(100);
+}
+```
+
+### Full BLE Setup
+
+```cpp
+#include "config.h"
+#include "ads1220_driver.h"
+#include "ble_manager.h"
+#include "eeg_streamer.h"
+#include "command_handler.h"
+#include "led_controller.h"
+
+ADS1220Driver ads1220;
+BLEManager bleManager;
+CommandHandler cmdHandler(&bleManager);
+EEGStreamer streamer(ads1220, &bleManager);
+LedController led;
+
+void setup() {
+  Serial.begin(SERIAL_BAUD);
+  led.init();
+  
+  if (!bleManager.init()) {
+    Serial.println("BLE init failed");
+    while (1) led.blink(1, 100);
+  }
+  
+  if (!ads1220.init()) {
+    Serial.println("ADC init failed");
+    while (1) led.blink(1, 100);
+  }
+  
+  Serial.println("Ready");
+  led.blink(2);
+}
+
+void loop() {
+  // Handle connection changes
+  if (bleManager.wasJustConnected()) {
+    streamer.start();
+  }
+  if (bleManager.wasJustDisconnected()) {
+    streamer.stop();
+  }
+  
+  bleManager.update();
+  
+  // Process commands
+  CommandHandler::Command cmd = cmdHandler.process();
+  if (cmd == CommandHandler::RESET) {
+    ads1220.reset();
+    ads1220.init();
+  }
+  
+  streamer.update();
+  delayMicroseconds(100);
+}
+```
+
+## Data Format
+
+### Serial Output
+
+Raw ADC values as decimal integers, one per line:
+
+```
+12543221
+12545009
+12543891
+12542003
+```
+
+### BLE Data Characteristic
+
+8-byte packets with the following structure:
+
+| Bytes | Type | Description |
+|-------|------|-------------|
+| 0-7 | String | ASCII representation of raw value |
+
+Example: `"12543221"`
+
+## Signal Conversion
+
+To convert raw ADC values to voltage:
+
+```cpp
+float voltage_uV = rawValue * (3300000.0 / 8388607.0);
+```
+
+To convert to electrode voltage (before amplification):
+
+```cpp
+float electrode_uV = voltage_uV / 100.0;  // Divide by AD8422 gain
+```
+
+## Thread Safety
+
+All functions are designed to be called from the main loop. Do not call from interrupts or callbacks except where noted.
+
+BLE callbacks use volatile flags that are safe to modify from interrupt context.

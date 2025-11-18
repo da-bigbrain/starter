@@ -1,0 +1,180 @@
+---
+title: "System Architecture"
+description: "Technical architecture of the NeuroFocus system"
+---
+
+# System Architecture
+
+NeuroFocus has two main components: hardware and firmware. This page explains how they work together.
+
+## Hardware Architecture
+
+### Signal Chain
+
+```
+Electrodes → AD8422 → ADS1220 → ESP32-S3 → BLE/USB
+```
+
+**1. Electrodes**
+- Capture electrical brain activity
+- Typical signal: 1-100 µV
+
+**2. AD8422 Instrumentation Amplifier**
+- Gain: 100x (configured with 100Ω resistor)
+- Amplifies weak EEG signals to measurable levels
+- High common-mode rejection removes noise
+
+**3. ADS1220 ADC**
+- 24-bit resolution
+- Sampling rate: 660 SPS (default)
+- External 3.3V reference
+- Differential input mode
+
+**4. ESP32-S3 Microcontroller**
+- Seeed Studio Xiao ESP32-S3
+- Handles SPI communication with ADC
+- Processes and streams data
+- Supports BLE and USB Serial
+
+### Power Supply
+
+- Input: USB 5V or battery
+- Regulator: TPAP2112K-3.3 LDO
+- Output: 3.3V for all components
+
+## Firmware Architecture
+
+The V4 firmware uses a component-based design. Each component handles one responsibility.
+
+### Components
+
+**ADS1220Driver**
+- Low-level SPI communication
+- ADC initialization and configuration
+- Data ready detection
+- Raw data reading
+
+**BLEManager** (optional)
+- Bluetooth setup and management
+- Connection handling
+- Data transmission via notifications
+- Command reception
+
+**EEGStreamer**
+- High-level streaming coordination
+- Routes data to Serial or BLE
+- Manages streaming state
+
+**CommandHandler**
+- Processes commands from Serial and BLE
+- Unified interface for both sources
+- Returns command enums
+
+**LedController**
+- Status LED management
+- Visual feedback for system state
+
+### Data Flow
+
+```
+ADS1220 → ADS1220Driver → EEGStreamer → BLE/Serial
+                                ↓
+                          CommandHandler
+```
+
+1. ADS1220Driver checks for new data
+2. EEGStreamer reads raw ADC values
+3. Data streams to Serial and/or BLE
+4. CommandHandler processes user commands
+5. Commands control streaming state
+
+## Communication Modes
+
+### BLE Mode
+
+When BLE is enabled:
+- Auto-starts streaming on connection
+- Auto-stops on disconnection
+- Commands from Serial or BLE
+- Data to both Serial and BLE
+
+### Serial Mode
+
+When BLE is disabled:
+- Manual command control only
+- Data to Serial only
+- Smaller firmware size
+- Lower power consumption
+
+## Design Patterns
+
+**Singleton Pattern**
+- BLEManager uses static instance for callbacks
+
+**Facade Pattern**
+- EEGStreamer simplifies complex operations
+
+**Strategy Pattern**
+- CommandHandler works with multiple sources
+
+**Dependency Injection**
+- Components accept dependencies via constructor
+
+## Signal Calculations
+
+### Electrode to ADC
+
+Input voltage at electrode: `V_electrode`
+
+After AD8422 amplification:
+```
+V_amplified = V_electrode × 100
+```
+
+Example: 50 µV signal becomes 5 mV
+
+### ADC Output
+
+The ADS1220 converts voltage to a 24-bit signed integer:
+
+```
+ADC_value = (V_amplified / V_ref) × (2^23 - 1)
+```
+
+Full-scale range: ±3.3V
+
+### Expected Values
+
+For typical EEG signals:
+
+| Signal (µV) | Amplified (mV) | ADC Value |
+|-------------|----------------|-----------|
+| 10 | 1.0 | ~2,533,000 |
+| 50 | 5.0 | ~12,665,000 |
+| 100 | 10.0 | ~25,330,000 |
+
+## Memory Management
+
+All components use stack allocation. No dynamic memory means predictable usage and no fragmentation.
+
+The BLE stack is managed by the ESP32 library with automatic buffer management.
+
+## Thread Safety
+
+Key volatile variables:
+- `deviceConnected` - Modified in ISR
+- `commandAvailable` - Modified in callback
+- `lastCommand` - Modified in callback
+
+The firmware uses flags to detect connection state changes safely.
+
+## Error Handling
+
+**Initialization Failures**
+- Critical failures halt with LED blink pattern
+- Non-critical failures log to Serial
+
+**Runtime Errors**
+- Graceful degradation
+- BLE send fails silently if disconnected
+- State validation before operations

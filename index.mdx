@@ -1,97 +1,79 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "NeuroFocus Documentation"
+description: "Open-source EEG acquisition system for neural interface research"
 ---
 
-## Setting up
+# NeuroFocus
 
-Get your documentation site up and running in minutes.
+NeuroFocus is a single-channel EEG acquisition system designed for researchers and developers. It uses the ADS1220 24-bit ADC and ESP32-S3 for high-quality neural signal capture.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+## What is NeuroFocus?
 
-## Make it yours
+NeuroFocus captures electrical brain activity through electrodes. The system amplifies weak signals and converts them to digital data you can analyze.
 
-Design a docs site that looks great and empowers your users.
+The latest version (V4) supports both Bluetooth Low Energy and USB Serial communication.
 
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
-  </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
-  </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+## Key Features
 
-## Create beautiful pages
+- **High Resolution**: 24-bit ADC with 660 SPS sampling
+- **Low Noise**: AD8422 instrumentation amplifier with 100x gain
+- **Wireless**: BLE support for remote monitoring
+- **Compact**: Custom PCB for Seeed Xiao ESP32-S3
+- **Open Source**: Full firmware and hardware files available
 
-Everything you need to create world-class documentation.
+## Who Should Use This?
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+NeuroFocus is for:
 
-## Need inspiration?
+- Researchers studying brain signals
+- Developers building neural interfaces
+- Students learning about EEG systems
+- Makers exploring biofeedback projects
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## Repository Structure
+
+```
+firmware/
+├── v4/          # Latest firmware (recommended)
+├── v3/          # Previous generation
+├── v2/          # Legacy 3-channel version
+├── v1/          # Initial prototype
+└── v0/          # Hardware reference only
+
+cad/             # PCB design files
+```
+
+## Quick Start
+
+The fastest way to get started is with V4 firmware:
+
+1. Install PlatformIO
+2. Connect your ESP32-S3 board
+3. Build and upload the firmware
+4. Start streaming EEG data
+
+See the [Getting Started](/getting-started) guide for details.
+
+## Hardware Versions
+
+| Version | Channels | Features | Status |
+|---------|----------|----------|--------|
+| V4 | 1 | BLE + Serial | **Current** |
+| V3 | 1 | Serial only | Legacy |
+| V2 | 3 | BLE | Legacy |
+| V1 | 1 | Basic | Legacy |
+
+## System Architecture
+
+NeuroFocus has two main parts:
+
+1. **Hardware**: PCB with amplifier and ADC
+2. **Firmware**: ESP32 code for data acquisition
+
+The system captures EEG signals at the electrodes, amplifies them 100x through the AD8422, and digitizes them with the ADS1220. The ESP32-S3 processes and streams the data via BLE or USB.
+
+## License
+
+GNU Affero General Public License v3.0
+
+This project is open source. You can use, modify, and distribute it under the terms of the AGPL-3.0 license.

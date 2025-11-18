@@ -1,0 +1,405 @@
+---
+title: "Hardware"
+description: "Hardware design and specifications"
+---
+
+# Hardware
+
+NeuroFocus V4 uses a custom PCB designed for the Seeed Xiao ESP32-S3 module.
+
+## PCB Overview
+
+The board has three main sections:
+
+1. **Amplifier Stage**: AD8422 instrumentation amplifier
+2. **ADC Stage**: ADS1220 24-bit analog-to-digital converter
+3. **Power Stage**: TPAP2112K-3.3 LDO regulator
+
+## Components
+
+### AD8422 Instrumentation Amplifier (U12)
+
+The AD8422 amplifies weak EEG signals from electrodes.
+
+**Specifications:**
+- Gain: 100x (set by 100Ω resistor at R6)
+- Input bias current: 25 pA typical
+- Common-mode rejection: 100 dB
+- Bandwidth: DC to 1 MHz
+- Supply voltage: 3.3V
+
+**Gain Calculation:**
+```
+Gain = 1 + (9.9kΩ / RG)
+Gain = 1 + (9900 / 100) = 100x
+```
+
+**Pin Connections:**
+- IN+: Positive electrode input
+- IN-: Negative electrode input
+- OUT: Connected to ADS1220 AIN0
+- RG: 100Ω resistor (R6)
+
+### ADS1220 ADC (U19)
+
+The ADS1220 converts amplified signals to digital values.
+
+**Specifications:**
+- Resolution: 24-bit
+- Sample rate: 20 to 2000 SPS (660 SPS in firmware)
+- Reference voltage: 3.3V external
+- Interface: SPI
+- Supply voltage: 3.3V
+
+**Pin Connections:**
+- AIN0: Amplified signal from AD8422
+- AIN1: Reference ground
+- REFP0/REFN0: External 3.3V reference
+- CS: Chip select (GPIO 34)
+- DRDY: Data ready (GPIO 33)
+- SCLK, MISO, MOSI: SPI bus
+
+**Configuration:**
+- Mode: Continuous conversion
+- Gain: 1x (PGA bypassed)
+- Data rate: 660 SPS
+- Filter: 50/60Hz rejection enabled
+
+### TPAP2112K-3.3 LDO Regulator
+
+Provides clean 3.3V power for all components.
+
+**Specifications:**
+- Input: 3.6V to 6.5V
+- Output: 3.3V
+- Current: Up to 300mA
+- Dropout: 200mV typical
+
+**Pin Connections:**
+- VIN: From USB 5V or battery
+- VOUT: 3.3V to all components
+- GND: Ground plane
+
+### Seeed Xiao ESP32-S3
+
+The microcontroller runs the firmware and handles communication.
+
+**Specifications:**
+- CPU: Dual-core Xtensa LX7, 240 MHz
+- RAM: 512 KB SRAM
+- Flash: 8 MB
+- Wireless: WiFi and BLE
+- USB: Native USB-C
+
+**Used Pins:**
+- GPIO 34: ADS1220 CS
+- GPIO 33: ADS1220 DRDY
+- GPIO 36: SPI SCLK
+- GPIO 37: SPI MISO
+- GPIO 35: SPI MOSI
+- GPIO 21: Status LED
+
+## Signal Chain
+
+### Input Stage
+
+```
+Electrode → AD8422 → ADS1220 → ESP32-S3
+```
+
+**Signal Levels:**
+
+| Stage | Typical Value |
+|-------|---------------|
+| Electrode | 10-100 µV |
+| After AD8422 | 1-10 mV |
+| ADC reading | ±8,388,607 counts |
+
+### Voltage References
+
+**External Reference (REFP0/REFN0):**
+- Source: 3.3V power supply
+- Used for: ADC full-scale range
+- Accuracy: ±50mV typical
+
+**Why External Reference:**
+- Better stability than internal 2.048V
+- Matches power supply rail
+- Simpler circuit design
+
+## Power Supply
+
+### Power Sources
+
+**USB Power:**
+- Input: 5V from USB-C
+- Regulated to: 3.3V by LDO
+- Current available: Up to 300mA
+
+**Battery Power:**
+- Input: 3.7V LiPo battery
+- Regulated to: 3.3V by LDO
+- Current available: Limited by battery
+
+### Power Consumption
+
+Typical current draw at 3.3V:
+
+| Component | Current |
+|-----------|---------|
+| ESP32-S3 | 80-150 mA |
+| ADS1220 | 0.3 mA |
+| AD8422 | 0.9 mA |
+| Total | ~150 mA |
+
+Battery life with 500mAh LiPo: ~3 hours
+
+## PCB Layout
+
+### Layer Stack
+
+The V4 board is a 2-layer PCB:
+
+- **Top layer**: Signal traces and components
+- **Bottom layer**: Ground plane
+
+### Design Considerations
+
+**Ground Plane:**
+- Large continuous ground pour
+- Reduces noise and EMI
+- Provides low-impedance return path
+
+**Signal Routing:**
+- Analog and digital separated
+- Short traces for high-speed signals
+- SPI traces kept under 5cm
+
+**Power Distribution:**
+- Star grounding from regulator
+- Decoupling caps near ICs
+- Wide power traces (>0.5mm)
+
+## Electrode Interface
+
+### Connectors
+
+The board has three electrode connections:
+
+1. **CH+ (Channel Positive)**: Main signal input
+2. **CH- (Channel Negative)**: Reference input
+3. **GND (Ground)**: Common ground
+
+### Recommended Electrodes
+
+**Type:** Ag/AgCl (silver/silver chloride)
+
+**Reasons:**
+- Low impedance
+- Stable over time
+- Low noise
+
+**Alternatives:**
+- Gold-plated: Higher impedance but reusable
+- Dry electrodes: Convenient but noisier
+
+### Electrode Preparation
+
+1. Clean skin with alcohol wipe
+2. Apply conductive gel to electrode
+3. Press firmly and secure with tape
+4. Check impedance (should be < 10kΩ)
+
+## Hardware Versions
+
+### V4-0
+
+- Initial design
+- Basic functionality working
+- No battery charging circuit
+
+### V4-1
+
+- Improved ground plane
+- Better component placement
+- Still no battery charging
+
+### V4-2
+
+- Added battery charging (TP4056)
+- USB-C connector improvements
+- Better EMI shielding
+
+### V4-3
+
+- Final component optimization
+- Production-ready design
+- Full documentation
+
+### V4-4
+
+- Latest iteration
+- Minor layout improvements
+
+## CAD Files
+
+The `cad/` directory contains design files for all versions.
+
+**File Format:** KiCad 6.0
+
+**Contents:**
+- Schematic (.kicad_sch)
+- PCB layout (.kicad_pcb)
+- Component libraries
+- Gerber files for manufacturing
+
+## Signal Quality
+
+### Expected Performance
+
+**Noise Floor:**
+- RMS noise: <2 µV (electrode input)
+- Peak-to-peak: <10 µV
+
+**Frequency Response:**
+- Low cutoff: 0.5 Hz (hardware)
+- High cutoff: 100 Hz (hardware)
+- Usable range: 1-40 Hz (typical EEG)
+
+**Common-Mode Rejection:**
+- >80 dB at 60 Hz
+- >70 dB at 50 Hz
+
+### Noise Sources
+
+**Environmental:**
+- 50/60Hz powerline interference
+- WiFi and BLE signals
+- Fluorescent lights
+
+**Mitigation:**
+- FIR filter in ADS1220
+- Shielded cables
+- Good electrode contact
+
+## Testing
+
+### Basic Tests
+
+**Power Supply:**
+- Measure 3.3V at test points
+- Check current draw (<200mA)
+
+**ADC Communication:**
+- Upload firmware
+- Check Serial output for "ADC init success"
+
+**Signal Acquisition:**
+- Connect test signal (10mV, 10Hz)
+- Verify ADC readings change appropriately
+
+### Advanced Tests
+
+**Frequency Response:**
+- Sweep input from 0.1 Hz to 100 Hz
+- Verify -3dB points match specs
+
+**Noise Measurement:**
+- Short inputs together
+- Measure RMS noise over 1 minute
+- Should be < 2 µV
+
+**Impedance Test:**
+- Apply known current (1 µA)
+- Measure voltage change
+- Calculate input impedance (should be >1 MΩ)
+
+## Troubleshooting
+
+### No Power
+
+**Check:**
+- USB cable connected
+- 5V present at LDO input
+- 3.3V present at LDO output
+
+**Common causes:**
+- Dead USB port
+- Faulty regulator
+- Short circuit on board
+
+### ADC Not Responding
+
+**Check:**
+- SPI connections to ESP32
+- Chip select line toggling
+- DRDY line going low when data ready
+
+**Common causes:**
+- Loose connection
+- Wrong pin assignments
+- SPI bus conflict
+
+### Noisy Signal
+
+**Check:**
+- Electrode impedance (<10kΩ)
+- Ground connection
+- Power supply ripple
+
+**Common causes:**
+- Poor electrode contact
+- 50/60Hz interference
+- Digital noise from ESP32
+
+## Modifications
+
+### Changing Gain
+
+To change amplifier gain, replace R6:
+
+```
+Gain = 1 + (9900 / R6)
+
+For 50x gain: R6 = 200Ω
+For 200x gain: R6 = 50Ω
+```
+
+### Adding Channels
+
+To add more channels:
+
+1. Add another AD8422 amplifier
+2. Connect output to ADS1220 AIN2 or AIN3
+3. Modify firmware to read multiple channels
+
+### Battery Charging
+
+Add a TP4056 charging module:
+
+1. Connect BAT+ to battery positive
+2. Connect BAT- to battery negative
+3. Connect USB 5V to TP4056 input
+
+## Safety
+
+### Electrical Isolation
+
+**Not Isolated:** This design has no electrical isolation. Do not use on patients or in medical settings.
+
+**Safe Uses:**
+- Personal research
+- Development and testing
+- Educational purposes
+
+**Unsafe Uses:**
+- Medical diagnosis
+- Clinical research
+- High-voltage environments
+
+### Precautions
+
+- Do not use near AC power
+- Keep away from water
+- Use only battery power for safety-critical applications
+- Never connect to mains-powered equipment

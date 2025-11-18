@@ -1,0 +1,426 @@
+---
+title: "BLE Interface"
+description: "Using Bluetooth Low Energy for wireless data"
+---
+
+# BLE Interface
+
+NeuroFocus V4 supports Bluetooth Low Energy for wireless data streaming.
+
+## Overview
+
+BLE mode lets you:
+
+- Stream EEG data wirelessly
+- Control the device remotely
+- Build mobile or web apps
+- Monitor from a distance
+
+## BLE Service Details
+
+**Device Name:** NEUROFOCUS_V4
+
+**Service UUID:** `0338ff7c-6251-4029-a5d5-24e4fa856c8d`
+
+### Characteristics
+
+**Data Characteristic**
+- UUID: `ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7`
+- Properties: READ, NOTIFY
+- Use: Receive EEG data stream
+- Format: 8-byte ASCII string
+
+**Command Characteristic**
+- UUID: `b5e3d1c9-8a2f-4e7b-9c6d-1a3f5e7b9c2d`
+- Properties: WRITE, WRITE_NO_RESPONSE
+- Use: Send commands to device
+- Format: Single ASCII character
+
+## Connecting
+
+### From Linux
+
+```bash
+# Start scanning
+bluetoothctl scan on
+
+# Find NEUROFOCUS_V4
+# Note the MAC address (XX:XX:XX:XX:XX:XX)
+
+# Connect
+bluetoothctl connect XX:XX:XX:XX:XX:XX
+
+# Trust device (optional, for auto-reconnect)
+bluetoothctl trust XX:XX:XX:XX:XX:XX
+```
+
+### From Python
+
+```python
+import asyncio
+from bleak import BleakClient, BleakScanner
+
+SERVICE_UUID = "0338ff7c-6251-4029-a5d5-24e4fa856c8d"
+DATA_CHAR_UUID = "ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7"
+CMD_CHAR_UUID = "b5e3d1c9-8a2f-4e7b-9c6d-1a3f5e7b9c2d"
+
+async def main():
+    # Find device
+    devices = await BleakScanner.discover()
+    neurofocus = None
+    for device in devices:
+        if device.name == "NEUROFOCUS_V4":
+            neurofocus = device
+            break
+    
+    if not neurofocus:
+        print("Device not found")
+        return
+    
+    # Connect
+    async with BleakClient(neurofocus.address) as client:
+        print(f"Connected to {neurofocus.name}")
+        
+        # Subscribe to data notifications
+        def callback(sender, data):
+            value = int(data.decode('ascii'))
+            print(f"EEG: {value}")
+        
+        await client.start_notify(DATA_CHAR_UUID, callback)
+        
+        # Send start command
+        await client.write_gatt_char(CMD_CHAR_UUID, b'b')
+        print("Streaming started")
+        
+        # Stream for 10 seconds
+        await asyncio.sleep(10)
+        
+        # Send stop command
+        await client.write_gatt_char(CMD_CHAR_UUID, b's')
+        print("Streaming stopped")
+
+asyncio.run(main())
+```
+
+### From Web Browser
+
+```javascript
+const SERVICE_UUID = '0338ff7c-6251-4029-a5d5-24e4fa856c8d';
+const DATA_CHAR_UUID = 'ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7';
+const CMD_CHAR_UUID = 'b5e3d1c9-8a2f-4e7b-9c6d-1a3f5e7b9c2d';
+
+async function connect() {
+  try {
+    // Request device
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: 'NEUROFOCUS_V4' }],
+      optionalServices: [SERVICE_UUID]
+    });
+    
+    // Connect to GATT server
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    
+    // Get characteristics
+    const dataChar = await service.getCharacteristic(DATA_CHAR_UUID);
+    const cmdChar = await service.getCharacteristic(CMD_CHAR_UUID);
+    
+    // Subscribe to data
+    await dataChar.startNotifications();
+    dataChar.addEventListener('characteristicvaluechanged', (event) => {
+      const value = new TextDecoder().decode(event.target.value);
+      console.log('EEG:', parseInt(value));
+    });
+    
+    // Start streaming
+    await cmdChar.writeValue(new TextEncoder().encode('b'));
+    console.log('Streaming started');
+    
+  } catch (error) {
+    console.error('Error:', error);
+  }
+}
+
+// Call connect() when user clicks a button
+document.getElementById('connectBtn').addEventListener('click', connect);
+```
+
+## Commands
+
+Send these via the Command Characteristic:
+
+| Command | Byte | Action |
+|---------|------|--------|
+| Start | `b` | Begin streaming |
+| Stop | `s` | Stop streaming |
+| Reset | `v` | Reset ADC |
+
+## Data Format
+
+Data arrives as 8-byte ASCII strings:
+
+```
+"12543221"
+"12545009"
+"12543891"
+```
+
+Each value is a signed 24-bit integer from the ADS1220.
+
+**Converting to voltage:**
+
+```python
+# Python example
+raw_value = 12543221
+voltage_uV = raw_value * (3300000.0 / 8388607.0)
+electrode_uV = voltage_uV / 100.0  # Divide by gain
+```
+
+## Auto-Start Behavior
+
+When BLE is enabled in firmware, streaming starts automatically on connection and stops on disconnection.
+
+**To disable auto-start:**
+
+Edit `src/main.cpp` and remove this code:
+
+```cpp
+if (bleManager.wasJustConnected()) {
+  streamer.start();
+}
+if (bleManager.wasJustDisconnected()) {
+  streamer.stop();
+}
+```
+
+## Troubleshooting
+
+### Can't Find Device
+
+**Check:**
+- BLE enabled in config.h
+- Firmware uploaded successfully
+- Device powered on
+- Bluetooth enabled on your computer/phone
+
+**Try:**
+- Power cycle the device
+- Restart Bluetooth on your computer
+- Move closer to the device
+
+### Connection Drops
+
+**Causes:**
+- Out of range (>10m)
+- Interference from other devices
+- Low battery
+
+**Solutions:**
+- Stay within 5m
+- Reduce WiFi/BLE interference
+- Check battery voltage
+
+### No Data Received
+
+**Check:**
+- Subscribed to notifications on Data Characteristic
+- Streaming started (sent 'b' command or auto-started)
+- Device is streaming (check Serial output)
+
+### Invalid Data
+
+**Check:**
+- Reading correct characteristic UUID
+- Decoding as ASCII string
+- Converting string to integer
+
+## Performance
+
+### Data Rate
+
+At 660 SPS:
+
+- 660 readings per second
+- ~5280 bytes per second
+- Well within BLE bandwidth
+
+### Latency
+
+Typical latency:
+- BLE connection: ~30-50ms
+- Notification interval: ~7.5ms (connection interval)
+- Total: ~40-60ms end-to-end
+
+### Range
+
+Typical BLE range:
+- Indoor: 10-20 meters
+- Outdoor: 30-50 meters
+- With obstacles: 5-10 meters
+
+## Building Apps
+
+### Mobile Apps
+
+**Android (Java/Kotlin):**
+- Use Android BLE API
+- BluetoothGatt for connection
+- GattCallback for notifications
+
+**iOS (Swift):**
+- Use CoreBluetooth framework
+- CBCentralManager for scanning
+- CBPeripheral for connection
+
+### Desktop Apps
+
+**Python:**
+- Use `bleak` library (cross-platform)
+- Simple async API
+- Works on Windows, Mac, Linux
+
+**Node.js:**
+- Use `noble` library
+- Event-based API
+- Cross-platform
+
+### Web Apps
+
+**Requirements:**
+- HTTPS connection (or localhost)
+- Chrome/Edge browser (Web Bluetooth support)
+- User gesture to trigger connection
+
+**Benefits:**
+- No installation needed
+- Works on desktop and mobile
+- Easy to share
+
+## Security
+
+### Pairing
+
+NeuroFocus doesn't require pairing. It uses "Just Works" pairing mode.
+
+**Implications:**
+- Anyone can connect
+- No encryption by default
+- Not suitable for sensitive data
+
+**To add security:**
+- Implement application-level encryption
+- Use pairing with PIN
+- Require authentication
+
+### Data Privacy
+
+BLE data is visible to nearby devices that know the service UUIDs.
+
+**Best practices:**
+- Use in private locations
+- Don't transmit personally identifiable information
+- Encrypt sensitive data at application level
+
+## Advanced Usage
+
+### Multiple Clients
+
+The firmware supports only one BLE connection at a time.
+
+**Connecting multiple clients:**
+- Add BLE relay server
+- Use Serial-to-BLE bridge
+- Implement BLE mesh (advanced)
+
+### Custom Characteristics
+
+To add custom characteristics:
+
+1. Edit `src/ble_manager.cpp`
+2. Create new characteristic
+3. Add read/write handlers
+4. Update UUIDs in documentation
+
+**Example:**
+
+```cpp
+// In BLEManager::init()
+BLECharacteristic* myChar = pService->createCharacteristic(
+  "12345678-1234-5678-1234-56789abcdef0",
+  BLECharacteristic::PROPERTY_READ | 
+  BLECharacteristic::PROPERTY_WRITE
+);
+```
+
+### OTA Updates
+
+To add over-the-air firmware updates:
+
+1. Add OTA characteristic
+2. Implement update protocol
+3. Handle firmware chunks
+4. Verify and flash new firmware
+
+This is advanced and requires careful implementation to avoid bricking the device.
+
+## Example Projects
+
+### Real-Time Visualization
+
+```python
+import asyncio
+import matplotlib.pyplot as plt
+from bleak import BleakClient
+from collections import deque
+
+SERVICE_UUID = "0338ff7c-6251-4029-a5d5-24e4fa856c8d"
+DATA_CHAR_UUID = "ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7"
+
+data = deque(maxlen=660)  # 1 second of data
+
+def callback(sender, data_bytes):
+    value = int(data_bytes.decode('ascii'))
+    data.append(value)
+
+async def stream():
+    device = await BleakScanner.find_device_by_name("NEUROFOCUS_V4")
+    async with BleakClient(device.address) as client:
+        await client.start_notify(DATA_CHAR_UUID, callback)
+        while True:
+            await asyncio.sleep(1)
+            plt.clf()
+            plt.plot(data)
+            plt.pause(0.01)
+
+asyncio.run(stream())
+```
+
+### Data Logger
+
+```python
+import asyncio
+import csv
+from datetime import datetime
+from bleak import BleakClient, BleakScanner
+
+SERVICE_UUID = "0338ff7c-6251-4029-a5d5-24e4fa856c8d"
+DATA_CHAR_UUID = "ad615f2b-cc93-4155-9e4d-f5f32cb9a2d7"
+
+csv_file = open('eeg_data.csv', 'w', newline='')
+writer = csv.writer(csv_file)
+writer.writerow(['timestamp', 'raw_value'])
+
+def callback(sender, data):
+    value = int(data.decode('ascii'))
+    timestamp = datetime.now().isoformat()
+    writer.writerow([timestamp, value])
+
+async def log():
+    device = await BleakScanner.find_device_by_name("NEUROFOCUS_V4")
+    async with BleakClient(device.address) as client:
+        await client.start_notify(DATA_CHAR_UUID, callback)
+        await asyncio.sleep(60)  # Log for 1 minute
+
+asyncio.run(log())
+csv_file.close()
+```
